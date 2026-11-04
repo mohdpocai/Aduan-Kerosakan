@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aduan Kerosakan Rumah LP2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow column, header band, checklist rows, sticky send bar at bottom */
+:root{
+  --bg:#f3f5f1; --card:#ffffff; --fg:#1d2420; --muted:#5f6b63; --line:#d9dfd8;
+  --accent:#2f5d3a; --accent-fg:#ffffff; --warn:#c2561a; --warn-bg:#fbeee5; --tick-bg:#e6efe7;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121613; --card:#1b201c; --fg:#e7ece7; --muted:#9aa69d; --line:#2e3630;
+  --accent:#6fae7c; --accent-fg:#0f1510; --warn:#f08a4b; --warn-bg:#3a2417; --tick-bg:#223326;
+  color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--body);
+  padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:560px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{background:var(--accent);color:var(--accent-fg);padding-top:env(safe-area-inset-top,0px)}
+header .wrap{padding-block:18px 16px}
+.eyebrow{font:600 12px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+h1{font:700 30px/1.05 var(--display);margin:6px 0 0;text-wrap:balance;letter-spacing:.01em}
+main .wrap{display:flex;flex-direction:column;gap:18px;padding-block:18px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px}
+h2{font:700 19px/1.1 var(--display);margin:0;letter-spacing:.03em;text-transform:uppercase}
+.hint{color:var(--muted);font-size:14px;margin:-6px 0 0}
+label.f{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:14px}
+input[type=text],input[type=date],textarea,select{font:16px var(--body);color:var(--fg);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:11px 12px;width:100%}
+textarea{min-height:80px;resize:vertical}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:380px){.row2{grid-template-columns:1fr}}
+
+.pri{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pri input{position:absolute;opacity:0}
+.pri label{border:1px solid var(--line);border-radius:8px;padding:10px 6px;text-align:center;font-weight:600;cursor:pointer;background:var(--bg)}
+.pri input:checked+label{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.pri input[value="KECEMASAN"]:checked+label{background:var(--warn);border-color:var(--warn);color:#fff}
+
+.list{display:flex;flex-direction:column}
+.item{border-top:1px solid var(--line);padding:4px 0}
+.item:first-child{border-top:0}
+.item>label{display:flex;align-items:center;gap:12px;padding:10px 4px;cursor:pointer;min-height:48px}
+.item input[type=checkbox]{width:24px;height:24px;accent-color:var(--warn);flex:none}
+.item .name{font-weight:600}
+.item .sub{color:var(--muted);font-size:13px;display:block;font-weight:400}
+.item.on{background:var(--warn-bg);border-radius:8px;border-top-color:transparent}
+.item.on+.item{border-top-color:transparent}
+.item .note{margin:0 4px 10px 40px;width:calc(100% - 44px)}
+
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--line);max-width:100%}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph button{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:16px;line-height:1;cursor:pointer}
+.add{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;aspect-ratio:1;border:2px dashed var(--line);border-radius:8px;color:var(--muted);font-weight:600;font-size:13px;cursor:pointer;background:transparent}
+.add svg{width:28px;height:28px}
+
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);
+  padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.bar .wrap{display:flex;gap:10px;align-items:center;padding-block:10px 0}
+.count{font-size:13px;color:var(--muted);line-height:1.2;min-width:0;flex:1}
+.count b{color:var(--fg);font-size:15px}
+.send{flex:none;border:0;border-radius:10px;background:#1f9d55;color:#fff;font:700 17px var(--display);letter-spacing:.04em;
+  text-transform:uppercase;padding:14px 18px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.send svg{width:20px;height:20px}
+.send:disabled{opacity:.5}
+.btn2{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:10px 12px;font:600 14px var(--body);cursor:pointer}
+.msg{font-size:14px;padding:10px 12px;border-radius:8px;background:var(--tick-bg)}
+.msg.err{background:var(--warn-bg);color:var(--fg)}
+pre.preview{white-space:pre-wrap;font:14px/1.4 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin:0;max-height:260px;overflow:auto}
+@media (prefers-reduced-motion:no-preference){.item{transition:background .15s}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="eyebrow">Labour Quarters · LP2</div>
+  <h1>Aduan Kerosakan Rumah</h1>
+</div></header>
+
+<main><div class="wrap">
+
+  <section>
+    <h2>Butiran</h2>
+    <div class="row2">
+      <label class="f">No. Rumah / Bilik<input type="text" id="rumah" placeholder="cth: Blok B-12" autocomplete="off"></label>
+      <label class="f">Tarikh<input type="date" id="tarikh"></label>
+    </div>
+    <label class="f">Nama Pelapor<input type="text" id="nama" placeholder="Nama penuh" autocomplete="name"></label>
+    <label class="f">No. Telefon<input type="text" id="tel" inputmode="tel" placeholder="cth: 012-3456789"></label>
+    <div class="f" style="display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:14px">
+      Tahap Keutamaan
+      <div class="pri" role="radiogroup">
+        <input type="radio" name="pri" id="p1" value="BIASA" checked><label for="p1">Biasa</label>
+        <input type="radio" name="pri" id="p2" value="SEGERA"><label for="p2">Segera</label>
+        <input type="radio" name="pri" id="p3" value="KECEMASAN"><label for="p3">Kecemasan</label>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Senarai Semak Kerosakan</h2>
+    <p class="hint">Tanda bahagian yang rosak. Tulis sedikit keterangan jika perlu.</p>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section>
+    <h2>Gambar</h2>
+    <p class="hint">Ambil gambar kerosakan. Maksimum 6 gambar.</p>
+    <div class="photos" id="photos">
+      <label class="add" for="cam">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        Tambah
+      </label>
+    </div>
+    <input type="file" id="cam" accept="image/*" capture="environment" multiple hidden>
+  </section>
+
+  <section>
+    <h2>Catatan Lain</h2>
+    <textarea id="catatan" placeholder="Keterangan tambahan (pilihan)"></textarea>
+  </section>
+
+  <section id="fallback" hidden>
+    <h2>Hantar Secara Manual</h2>
+    <div class="msg" id="fbmsg"></div>
+    <pre class="preview" id="preview"></pre>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn2" type="button" id="copy">Salin Teks</button>
+      <a class="btn2" id="walink" href="#" target="_blank" rel="noopener" style="text-decoration:none">Buka WhatsApp</a>
+    </div>
+  </section>
+
+  <button class="btn2" type="button" id="reset" style="align-self:center">Kosongkan Borang</button>
+</div></main>
+
+<div class="bar"><div class="wrap">
+  <div class="count" id="count"><b>0</b> kerosakan · 0 gambar</div>
+  <button class="send" id="send" type="button">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.9s.7-2.1 1-2.4c.3-.3.6-.3.8-.3h.6c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.4c-.1.2-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.4 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l2 1c.3.1.5.2.5.3.1.2.1.7-.1 1.3z"/></svg>
+    Hantar
+  </button>
+</div></div>
+
+<script>
+const ITEMS = [
+  ["Bumbung / Atap","Bocor, zink tercabut"],
+  ["Siling","Pecah, berlubang, kesan air"],
+  ["Dinding","Retak, berlubang"],
+  ["Lantai","Pecah, mendap"],
+  ["Pintu","Engsel, tombol, kunci"],
+  ["Tingkap","Kaca pecah, selak, jaring"],
+  ["Lampu","Mentol / lampu kalimantang"],
+  ["Suis / Soket","Rosak, berpercikan"],
+  ["Kipas","Tidak berfungsi, bising"],
+  ["Pendawaian Elektrik","Wayar terdedah, litar pintas"],
+  ["Paip / Pili Air","Bocor, tiada air"],
+  ["Sinki Dapur","Tersumbat, bocor"],
+  ["Tandas","Tersumbat, pam rosak"],
+  ["Bilik Mandi","Bocor, longkang tersumbat"],
+  ["Tangki Air","Bocor, penutup hilang"],
+  ["Longkang / Saliran","Tersumbat, bertakung"],
+  ["Tangga / Beranda","Kayu reput, pagar rosak"],
+  ["Lain-lain","Nyatakan dalam keterangan"]
+];
+const $ = id => document.getElementById(id);
+const list = $("list"), photosEl = $("photos"), addBtn = photosEl.querySelector(".add");
+let photos = []; // {blob,url,name}
+
+ITEMS.forEach(([name,sub],i)=>{
+  const d=document.createElement("div"); d.className="item";
+  d.innerHTML=`<label><input type="checkbox" id="c${i}"><span><span class="name">${name}</span><span class="sub">${sub}</span></span></label>
+  <input type="text" class="note" id="n${i}" placeholder="Keterangan ${name.toLowerCase()}" hidden>`;
+  const cb=d.querySelector("input[type=checkbox]"), note=d.querySelector(".note");
+  cb.addEventListener("change",()=>{d.classList.toggle("on",cb.checked);note.hidden=!cb.checked;if(cb.checked)note.focus();update();});
+  list.appendChild(d);
+});
+
+function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+$("tarikh").value=today();
+
+// remember reporter details on this phone
+try{["rumah","nama","tel"].forEach(k=>{const v=localStorage.getItem("ak_"+k);if(v)$(k).value=v;});}catch(e){}
+
+function checked(){return ITEMS.map((it,i)=>({name:it[0],on:$("c"+i).checked,note:$("n"+i).value.trim()})).filter(x=>x.on);}
+function update(){
+  const n=checked().length;
+  $("count").innerHTML=`<b>${n}</b> kerosakan · ${photos.length} gambar`;
+  addBtn.hidden = photos.length>=6;
+}
+
+// shrink photos so WhatsApp sends fast on estate signal
+function shrink(file){
+  return new Promise(res=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=1280, s=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas"); c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(url);
+      c.toBlob(b=>res(b||file),"image/jpeg",0.8);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);res(file);};
+    img.src=url;
+  });
+}
+$("cam").addEventListener("change",async e=>{
+  for(const f of [...e.target.files]){
+    if(photos.length>=6)break;
+    const b=await shrink(f); const p={blob:b,url:URL.createObjectURL(b)};
+    photos.push(p); renderPhotos();
+  }
+  e.target.value="";
+});
+function renderPhotos(){
+  photosEl.querySelectorAll(".ph").forEach(x=>x.remove());
+  photos.forEach((p,i)=>{
+    const d=document.createElement("div"); d.className="ph";
+    d.innerHTML=`<img src="${p.url}" alt="Gambar ${i+1}"><button type="button" aria-label="Buang gambar">×</button>`;
+    d.querySelector("button").onclick=()=>{URL.revokeObjectURL(p.url);photos.splice(i,1);renderPhotos();};
+    photosEl.insertBefore(d,addBtn);
+  });
+  update();
+}
+
+function fmtDate(v){if(!v)return "-";const [y,m,d]=v.split("-");return `${d}/${m}/${y}`;}
+function buildText(){
+  const pri=document.querySelector("input[name=pri]:checked").value;
+  const items=checked();
+  let t=`*ADUAN KEROSAKAN RUMAH*\n_Labour Quarters LP2_\n\n`;
+  t+=`🏠 No. Rumah: *${$("rumah").value.trim()||"-"}*\n`;
+  t+=`📅 Tarikh: ${fmtDate($("tarikh").value)}\n`;
+  t+=`👤 Pelapor: ${$("nama").value.trim()||"-"}\n`;
+  if($("tel").value.trim()) t+=`📞 Tel: ${$("tel").value.trim()}\n`;
+  t+=`⚠️ Keutamaan: *${pri}*\n\n*Kerosakan (${items.length}):*\n`;
+  items.forEach((x,i)=>{t+=`${i+1}. ${x.name}${x.note?" – "+x.note:""}\n`;});
+  const c=$("catatan").value.trim(); if(c) t+=`\n*Catatan:* ${c}\n`;
+  if(photos.length) t+=`\n📷 ${photos.length} gambar dilampirkan`;
+  return t;
+}
+
+$("send").addEventListener("click",async()=>{
+  const fb=$("fallback");
+  if(!$("rumah").value.trim()){ $("rumah").focus(); $("rumah").scrollIntoView({block:"center"}); return; }
+  if(!checked().length){ list.scrollIntoView({block:"start"}); return; }
+  try{["rumah","nama","tel"].forEach(k=>localStorage.setItem("ak_"+k,$(k).value.trim()));}catch(e){}
+  const text=buildText();
+  const stamp=$("tarikh").value.replace(/-/g,"");
+  const files=photos.map((p,i)=>new File([p.blob],`kerosakan_${($("rumah").value||"rumah").replace(/\W+/g,"")}_${stamp}_${i+1}.jpg`,{type:"image/jpeg"}));
+  if(navigator.share){
+    const data = files.length && navigator.canShare && navigator.canShare({files}) ? {files,text} : {text};
+    try{
+      // copy text too, in case WhatsApp drops the caption
+      try{await navigator.clipboard.writeText(text);}catch(e){}
+      await navigator.share(data);
+      if(!data.files && files.length) showFallback(text,"Telefon ini tidak boleh kongsi gambar terus. Lampirkan gambar secara manual dalam WhatsApp.");
+      else fb.hidden=true;
+      return;
+    }catch(e){ if(e.name==="AbortError") return; }
+  }
+  showFallback(text, files.length ? "Tekan Buka WhatsApp, pilih group, kemudian lampirkan gambar secara manual." : "Tekan Buka WhatsApp dan pilih group.");
+});
+function showFallback(text,msg){
+  $("fbmsg").textContent=msg; $("preview").textContent=text;
+  $("walink").href="https://wa.me/?text="+encodeURIComponent(text);
+  $("fallback").hidden=false; $("fallback").scrollIntoView({block:"start",behavior:"smooth"});
+}
+$("copy").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText($("preview").textContent);$("copy").textContent="Disalin";}
+  catch(e){const r=document.createRange();r.selectNodeContents($("preview"));const s=getSelection();s.removeAllRanges();s.addRange(r);}
+});
+$("reset").addEventListener("click",()=>{
+  ITEMS.forEach((_,i)=>{$("c"+i).checked=false;$("n"+i).value="";$("n"+i).hidden=true;$("c"+i).closest(".item").classList.remove("on");});
+  photos.forEach(p=>URL.revokeObjectURL(p.url)); photos=[]; renderPhotos();
+  $("catatan").value=""; $("tarikh").value=today(); $("p1").checked=true; $("fallback").hidden=true;
+  window.scrollTo({top:0});
+});
+update();
+</script>
+</body>
+</html>
