@@ -140,6 +140,8 @@ pre.preview{white-space:pre-wrap;font:14px/1.4 ui-monospace,Menlo,Consolas,monos
     </div>
   </section>
 
+  <div class="msg" id="saved" role="status" hidden></div>
+
   <button class="btn2" type="button" id="reset" style="align-self:center">Kosongkan Borang</button>
 </div></main>
 
@@ -152,6 +154,9 @@ pre.preview{white-space:pre-wrap;font:14px/1.4 ui-monospace,Menlo,Consolas,monos
 </div></div>
 
 <script>
+// Link Web app Google Apps Script (Deploy > Web app). Kosong = tidak simpan ke Google Sheet.
+const SCRIPT_URL = "";
+
 const ITEMS = [
   ["Bumbung / Atap","Bocor, zink tercabut"],
   ["Siling","Pecah, berlubang, kesan air"],
@@ -215,7 +220,7 @@ function shrink(file){
 $("cam").addEventListener("change",async e=>{
   for(const f of [...e.target.files]){
     if(photos.length>=6)break;
-    const b=await shrink(f); const p={blob:b,url:URL.createObjectURL(b)};
+    const b=await shrink(f); const p={blob:b,url:URL.createObjectURL(b),b64:await toB64(b)};
     photos.push(p); renderPhotos();
   }
   e.target.value="";
@@ -231,11 +236,44 @@ function renderPhotos(){
   update();
 }
 
+function toB64(blob){
+  return new Promise(res=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]||"");r.onerror=()=>res("");r.readAsDataURL(blob);});
+}
+let reportId=null;
+function newId(){
+  const d=new Date(),p=n=>String(n).padStart(2,"0");
+  return `AK-${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+function setSaved(state,text){
+  const el=$("saved"); el.hidden=false; el.className="msg"+(state==="err"?" err":"");
+  el.textContent=text;
+  if(state==="err"){
+    const b=document.createElement("button"); b.type="button"; b.className="btn2"; b.textContent="Cuba Simpan Semula";
+    b.style.marginLeft="8px"; b.onclick=()=>saveToSheet(); el.appendChild(b);
+  }
+}
+function saveToSheet(){
+  if(!SCRIPT_URL) return Promise.resolve(null);
+  const payload={
+    id:reportId, rumah:$("rumah").value.trim(), tarikh:$("tarikh").value,
+    nama:$("nama").value.trim(), tel:$("tel").value.trim(),
+    pri:document.querySelector("input[name=pri]:checked").value,
+    items:checked().map(x=>({name:x.name,note:x.note})),
+    catatan:$("catatan").value.trim(), photos:photos.map(p=>p.b64).filter(Boolean)
+  };
+  setSaved("busy","Menyimpan ke Google Sheet…");
+  // text/plain body = tiada preflight CORS untuk Apps Script
+  return fetch(SCRIPT_URL,{method:"POST",body:JSON.stringify(payload)})
+    .then(r=>r.json())
+    .then(j=>{ if(!j.ok) throw new Error(j.error||"gagal"); setSaved("ok",`✓ Disimpan dalam Google Sheet (ID ${reportId})`); return j; })
+    .catch(()=>{ setSaved("err","Gagal simpan ke Google Sheet. Semak internet."); return null; });
+}
+
 function fmtDate(v){if(!v)return "-";const [y,m,d]=v.split("-");return `${d}/${m}/${y}`;}
 function buildText(){
   const pri=document.querySelector("input[name=pri]:checked").value;
   const items=checked();
-  let t=`*ADUAN KEROSAKAN RUMAH*\n_Labour Quarters LP2_\n\n`;
+  let t=`*ADUAN KEROSAKAN RUMAH*\n_Labour Quarters LP2_\n🆔 ${reportId}\n\n`;
   t+=`🏠 No. Rumah: *${$("rumah").value.trim()||"-"}*\n`;
   t+=`📅 Tarikh: ${fmtDate($("tarikh").value)}\n`;
   t+=`👤 Pelapor: ${$("nama").value.trim()||"-"}\n`;
@@ -252,6 +290,8 @@ $("send").addEventListener("click",async()=>{
   if(!$("rumah").value.trim()){ $("rumah").focus(); $("rumah").scrollIntoView({block:"center"}); return; }
   if(!checked().length){ list.scrollIntoView({block:"start"}); return; }
   try{["rumah","nama","tel"].forEach(k=>localStorage.setItem("ak_"+k,$(k).value.trim()));}catch(e){}
+  if(!reportId) reportId=newId();
+  saveToSheet(); // berjalan serentak, tidak menunggu
   const text=buildText();
   const stamp=$("tarikh").value.replace(/-/g,"");
   const files=photos.map((p,i)=>new File([p.blob],`kerosakan_${($("rumah").value||"rumah").replace(/\W+/g,"")}_${stamp}_${i+1}.jpg`,{type:"image/jpeg"}));
@@ -281,6 +321,7 @@ $("reset").addEventListener("click",()=>{
   ITEMS.forEach((_,i)=>{$("c"+i).checked=false;$("n"+i).value="";$("n"+i).hidden=true;$("c"+i).closest(".item").classList.remove("on");});
   photos.forEach(p=>URL.revokeObjectURL(p.url)); photos=[]; renderPhotos();
   $("catatan").value=""; $("tarikh").value=today(); $("p1").checked=true; $("fallback").hidden=true;
+  reportId=null; $("saved").hidden=true;
   window.scrollTo({top:0});
 });
 update();
