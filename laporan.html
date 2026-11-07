@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Ringkasan Aduan LP2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column; header band, summary tiles, damage-by-type bars, filterable report list */
+:root{
+  --bg:#f3f5f1; --card:#ffffff; --fg:#1d2420; --muted:#5f6b63; --line:#d9dfd8;
+  --accent:#2f5d3a; --accent-fg:#ffffff; --soft:#e6efe7;
+  --baru:#c2561a; --baru-bg:#fbeee5; --proses:#9a7a12; --proses-bg:#f8f0d6; --siap:#2f7a45; --siap-bg:#e2f1e6;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#121613; --card:#1b201c; --fg:#e7ece7; --muted:#9aa69d; --line:#2e3630; --accent:#6fae7c; --accent-fg:#0f1510; --soft:#223326;
+  --baru:#f08a4b; --baru-bg:#3a2417; --proses:#e0c25a; --proses-bg:#352e14; --siap:#7cc88f; --siap-bg:#1d3324; color-scheme:dark;}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font:16px/1.45 var(--body)}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{background:var(--accent);color:var(--accent-fg);padding-top:env(safe-area-inset-top,0px)}
+header .wrap{padding-block:18px 16px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font:600 12px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+h1{font:700 30px/1.05 var(--display);margin:6px 0 0;letter-spacing:.01em}
+header .acts{display:flex;gap:8px;flex-wrap:wrap}
+header .acts a,header .acts button{color:var(--accent-fg);border:1px solid color-mix(in srgb,var(--accent-fg) 45%,transparent);background:transparent;border-radius:8px;padding:8px 12px;font:600 14px var(--body);text-decoration:none;cursor:pointer}
+main .wrap{display:flex;flex-direction:column;gap:18px;padding-block:18px 40px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+h2{font:700 19px/1.1 var(--display);margin:0;letter-spacing:.03em;text-transform:uppercase}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:7px 14px;font:600 14px var(--body);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .n{font:700 34px/1 var(--display);font-variant-numeric:tabular-nums}
+.tile .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.tile.warn .n{color:var(--baru)}
+.stack{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--soft)}
+.stack span{display:block;height:100%}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.legend b{color:var(--fg);font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:minmax(110px,38%) 1fr 28px;gap:10px;align-items:center;font-size:15px}
+.bar .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .track{height:12px;background:var(--soft);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent);border-radius:6px}
+.bar .c{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.list{display:flex;flex-direction:column;gap:12px}
+.rep{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.rep summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.rep summary::-webkit-details-marker{display:none}
+.rep .h{min-width:0}
+.rep .house{font:700 21px/1.1 var(--display)}
+.rep .when{font-size:13px;color:var(--muted)}
+.pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+.pill{font:700 12px/1 var(--body);padding:5px 9px;border-radius:999px;letter-spacing:.03em;text-transform:uppercase}
+.s-Baru{background:var(--baru-bg);color:var(--baru)}
+.s-Dalam{background:var(--proses-bg);color:var(--proses)}
+.s-Selesai{background:var(--siap-bg);color:var(--siap)}
+.p-KECEMASAN{background:var(--baru);color:#fff}
+.p-SEGERA{background:var(--proses-bg);color:var(--proses)}
+.body{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line)}
+.body ol{margin:10px 0 0;padding-left:22px}
+.body li{margin:3px 0}
+.body li span{color:var(--muted)}
+.meta{font-size:14px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+.meta b{color:var(--fg);font-weight:600}
+.note{font-size:14px;background:var(--soft);border-radius:8px;padding:8px 10px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.thumbs a{display:block;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--soft);max-width:100%;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none}
+.thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs a.txt{display:flex;align-items:center;justify-content:center}
+.empty{color:var(--muted);text-align:center;padding:20px 8px}
+.gate{max-width:360px;margin:40px auto}
+.gate input{font:600 24px var(--body);letter-spacing:.3em;text-align:center;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
+.btn{border:0;border-radius:10px;background:var(--accent);color:var(--accent-fg);font:700 17px var(--display);letter-spacing:.04em;text-transform:uppercase;padding:13px 18px;cursor:pointer}
+.err{color:var(--baru);font-size:14px;min-height:1.2em}
+.muted{color:var(--muted);font-size:13px}
+button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div><div class="eyebrow">Labour Quarters · LP2</div><h1>Ringkasan Aduan Kerosakan</h1></div>
+  <div class="acts" id="acts" hidden>
+    <a id="pdf" target="_blank" rel="noopener">Buat PDF</a>
+    <button type="button" id="reload">Muat Semula</button>
+  </div>
+</div></header>
+
+<main><div class="wrap" id="app">
+
+  <section class="gate" id="gate">
+    <h2>Masukkan PIN</h2>
+    <p class="muted" style="margin:-6px 0 0">Halaman ini untuk penyelia sahaja.</p>
+    <input id="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" aria-label="PIN">
+    <div class="err" id="perr"></div>
+    <button class="btn" id="go" type="button">Buka</button>
+  </section>
+
+  <div id="dash" hidden style="display:contents">
+    <div class="chips" id="months" role="group" aria-label="Pilih bulan"></div>
+
+    <div class="tiles">
+      <div class="tile"><div class="n" id="tA">0</div><div class="l">Aduan</div></div>
+      <div class="tile"><div class="n" id="tI">0</div><div class="l">Item rosak</div></div>
+      <div class="tile warn"><div class="n" id="tB">0</div><div class="l">Belum selesai</div></div>
+      <div class="tile"><div class="n" id="tK">0</div><div class="l">Kecemasan</div></div>
+    </div>
+
+    <section>
+      <h2>Status Tindakan</h2>
+      <div class="stack" id="stack"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section>
+      <h2>Kerosakan Mengikut Jenis</h2>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section>
+      <h2>Senarai Aduan</h2>
+      <div class="chips" id="sfilter" role="group" aria-label="Tapis status"></div>
+      <div class="list" id="list"></div>
+      <p class="muted" style="margin:0">Untuk tukar status atau tulis tindakan, kemaskini dalam Google Sheet <b>Aduan Kerosakan LP2 - LAPORAN</b>, kemudian tekan Muat Semula.</p>
+    </section>
+  </div>
+</div></main>
+
+<script>
+const API = "https://script.google.com/macros/s/AKfycbzU6pDvKssZX2cby47sZIrLs7LtiB4VF9Qe5j7jvULucBC6ZW-A5-b30-SwBGya3Uw/exec";
+const BM = ["Jan","Feb","Mac","Apr","Mei","Jun","Jul","Ogo","Sep","Okt","Nov","Dis"];
+const BMF = ["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let ALL = [], month = null, sfil = "Semua", PIN = "";
+
+function store(k,v){try{v===undefined?localStorage.removeItem(k):localStorage.setItem(k,v);}catch(e){}}
+function load(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+
+async function fetchData(pin){
+  const r = await fetch(API + "?data=" + encodeURIComponent(pin));
+  return r.json();
+}
+async function openDash(pin){
+  $("perr").textContent = ""; $("go").disabled = true; $("go").textContent = "Memuatkan…";
+  try{
+    const j = await fetchData(pin);
+    if(!j.ok){ $("perr").textContent = j.error === "PIN salah" ? "PIN salah. Cuba lagi." : "Gagal: " + j.error; store("ak_pin"); return; }
+    PIN = pin; store("ak_pin", pin); ALL = j.aduan;
+    $("gate").hidden = true; $("dash").hidden = false; $("acts").hidden = false;
+    buildMonths(); render();
+  }catch(e){ $("perr").textContent = "Tiada sambungan internet. Cuba lagi."; }
+  finally{ $("go").disabled = false; $("go").textContent = "Buka"; }
+}
+$("go").onclick = () => openDash($("pin").value.trim());
+$("pin").addEventListener("keydown", e => { if(e.key === "Enter") openDash($("pin").value.trim()); });
+$("reload").onclick = async () => {
+  $("reload").textContent = "Memuatkan…";
+  try{ const j = await fetchData(PIN); if(j.ok){ ALL = j.aduan; buildMonths(); render(); } }catch(e){}
+  $("reload").textContent = "Muat Semula";
+};
+
+const ym = a => a.masa.slice(0,7);
+function buildMonths(){
+  const ms = [...new Set(ALL.map(ym).filter(Boolean))].sort().reverse();
+  if(!month || (month !== "all" && !ms.includes(month))) month = ms[0] || "all";
+  const el = $("months"); el.innerHTML = "";
+  [...ms.map(m => [m, BM[+m.slice(5)-1] + " " + m.slice(0,4)]), ["all","Semua"]].forEach(([v,l]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = l;
+    b.setAttribute("aria-pressed", v === month); b.onclick = () => { month = v; buildMonths(); render(); };
+    el.appendChild(b);
+  });
+}
+const stKey = s => s.startsWith("Dalam") ? "Dalam" : (s === "Selesai" ? "Selesai" : "Baru");
+
+function render(){
+  const L = ALL.filter(a => month === "all" || ym(a) === month);
+  $("pdf").href = API + "?pdf=LP2" + (month !== "all" ? "&bulan=" + month : "");
+  // tiles
+  const items = L.reduce((n,a) => n + a.items.length, 0);
+  const cnt = {Baru:0, Dalam:0, Selesai:0}; L.forEach(a => cnt[stKey(a.status)]++);
+  $("tA").textContent = L.length; $("tI").textContent = items;
+  $("tB").textContent = cnt.Baru + cnt.Dalam; $("tK").textContent = L.filter(a => a.pri === "KECEMASAN").length;
+  // status stack
+  const cols = {Baru:"var(--baru)", Dalam:"var(--proses)", Selesai:"var(--siap)"};
+  const names = {Baru:"Baru", Dalam:"Dalam Tindakan", Selesai:"Selesai"};
+  $("stack").innerHTML = L.length ? Object.keys(cnt).filter(k => cnt[k]).map(k => `<span style="width:${cnt[k]/L.length*100}%;background:${cols[k]}"></span>`).join("") : "";
+  $("legend").innerHTML = Object.keys(cnt).map(k => `<span><i class="dot" style="background:${cols[k]}"></i>${names[k]} <b>${cnt[k]}</b></span>`).join("");
+  // by type
+  const t = {}; L.forEach(a => a.items.forEach(i => { (t[i.name] = t[i.name] || new Set()).add(a.id); }));
+  const rows = Object.entries(t).map(([k,s]) => [k, s.size]).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+  const max = rows.length ? rows[0][1] : 1;
+  $("bars").innerHTML = rows.length ? rows.map(([k,n]) => `<div class="bar"><div class="t" title="${esc(k)}">${esc(k)}</div><div class="track"><div class="fill" style="width:${n/max*100}%"></div></div><div class="c">${n}</div></div>`).join("")
+    : `<div class="empty">Tiada kerosakan dilaporkan.</div>`;
+  // status filter
+  const sf = $("sfilter"); sf.innerHTML = "";
+  ["Semua","Baru","Dalam Tindakan","Selesai"].forEach(s => {
+    const n = s === "Semua" ? L.length : cnt[stKey(s)];
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = `${s} (${n})`;
+    b.setAttribute("aria-pressed", s === sfil); b.onclick = () => { sfil = s; render(); }; sf.appendChild(b);
+  });
+  // list
+  const F = L.filter(a => sfil === "Semua" || stKey(a.status) === stKey(sfil)).sort((a,b) => b.masa.localeCompare(a.masa));
+  $("list").innerHTML = F.length ? F.map(card).join("") : `<div class="empty">Tiada aduan dalam senarai ini.</div>`;
+}
+function fmt(m){ if(!m) return "-"; const [d,t] = m.split("T"); const [y,mo,da] = d.split("-"); return `${+da} ${BMF[+mo-1]} ${y}, ${t}`; }
+function card(a){
+  const st = stKey(a.status);
+  const pri = a.pri !== "BIASA" ? `<span class="pill p-${esc(a.pri)}">${esc(a.pri)}</span>` : "";
+  const photos = a.photos.map((id,i) => `<a href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener"><img loading="lazy" alt="Gambar ${i+1}" src="https://drive.google.com/thumbnail?id=${id}&sz=w320" onerror="this.parentNode.classList.add('txt');this.parentNode.textContent='Gambar ${i+1}'"></a>`).join("");
+  return `<details class="rep">
+    <summary><div class="h"><div class="house">${esc(a.rumah || "-")}</div><div class="when">${fmt(a.masa)} · ${a.items.length} item${a.photos.length ? " · " + a.photos.length + " gambar" : ""}</div></div>
+    <div class="pills">${pri}<span class="pill s-${st}">${esc(a.status)}</span></div></summary>
+    <div class="body">
+      <ol>${a.items.map(i => `<li>${esc(i.name)}${i.note ? ` <span>– ${esc(i.note)}</span>` : ""}</li>`).join("")}</ol>
+      ${a.catatan ? `<div class="note"><b>Catatan:</b> ${esc(a.catatan)}</div>` : ""}
+      ${a.tindakan ? `<div class="note"><b>Tindakan penyelia:</b> ${esc(a.tindakan)}</div>` : ""}
+      ${photos ? `<div class="thumbs">${photos}</div>` : `<div class="muted">Tiada gambar.</div>`}
+      <div class="meta"><span>Pelapor: <b>${esc(a.nama || "-")}</b></span><span>Tel: <b>${esc(a.tel || "-")}</b></span><span>${esc(a.id)}</span></div>
+    </div></details>`;
+}
+
+const saved = load("ak_pin");
+if(saved){ $("pin").value = saved; openDash(saved); }
+</script>
+</body>
+</html>

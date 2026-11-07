@@ -70,7 +70,38 @@ function doPost(e) {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (p.pdf === PDF_KEY) return buatPDF(p.bulan);
+  if (p.data !== undefined) return p.data === DATA_PIN ? out(senaraiAduan()) : out({ ok: false, error: 'PIN salah' });
   return out({ ok: true, msg: 'Aduan Kerosakan LP2 sedia menerima aduan' });
+}
+
+/* ---------- DATA UNTUK HALAMAN RINGKASAN (laporan.html) ---------- */
+const DATA_PIN = '708602';
+
+function senaraiAduan() {
+  const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return { ok: true, aduan: [] };
+  const rows = sh.getRange(2, 1, n, 13).getValues();
+  const rich = sh.getRange(2, 11, n, 1).getRichTextValues();
+  const aduan = rows.map((r, i) => {
+    const id = String(r[1] || '');
+    const m = id.match(/^AK-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
+    const photos = [];
+    (rich[i][0] ? rich[i][0].getRuns() : []).forEach(run => {
+      const u = run.getLinkUrl(); const f = u && u.match(/\/d\/([\w-]+)/); if (f) photos.push(f[1]);
+    });
+    return {
+      id: id, row: i + 2,
+      masa: m ? m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] : '',
+      rumah: String(r[2] || ''), nama: String(r[4] || ''), tel: String(r[5] || ''), pri: String(r[6] || 'BIASA'),
+      items: String(r[8] || '').split('\n').filter(String).map(t => {
+        const s = t.replace(/^\d+\.\s*/, ''), c = s.indexOf(' - ');
+        return c > -1 ? { name: s.slice(0, c), note: s.slice(c + 3) } : { name: s, note: '' };
+      }),
+      catatan: String(r[9] || ''), status: String(r[11] || 'Baru'), tindakan: String(r[12] || ''), photos: photos
+    };
+  }).filter(a => a.id);
+  return { ok: true, aduan: aduan };
 }
 
 /* ---------- LAPORAN PDF ---------- */
