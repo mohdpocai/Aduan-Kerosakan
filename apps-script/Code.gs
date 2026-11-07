@@ -13,7 +13,9 @@ function doPost(e) {
   lock.waitLock(30000);
   try {
     const d = JSON.parse(e.postData.contents);
-    const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    if (ss.getSpreadsheetTimeZone() !== 'Asia/Kuala_Lumpur') ss.setSpreadsheetTimeZone('Asia/Kuala_Lumpur');
+    const sh = ss.getSheets()[0];
     if (sh.getLastRow() === 0) sh.appendRow(HEADERS);
 
     // Elak rekod berganda jika telefon hantar dua kali
@@ -62,9 +64,140 @@ function doPost(e) {
   }
 }
 
-// Buka link Web app dalam browser untuk semak ia berfungsi
-function doGet() {
+// Buka link Web app dalam browser untuk semak ia berfungsi.
+// Tambah ?pdf=LP2 pada hujung link untuk buat Laporan PDF bulan ini.
+// Contoh bulan lain: ?pdf=LP2&bulan=2026-10
+function doGet(e) {
+  const p = (e && e.parameter) || {};
+  if (p.pdf === PDF_KEY) return buatPDF(p.bulan);
   return out({ ok: true, msg: 'Aduan Kerosakan LP2 sedia menerima aduan' });
+}
+
+/* ---------- LAPORAN PDF ---------- */
+const PDF_KEY = 'LP2';
+const TZ = 'Asia/Kuala_Lumpur';
+
+function buatPDF(bulan) {
+  try {
+    const now = new Date();
+    bulan = /^\d{4}-\d{2}$/.test(bulan || '') ? bulan : Utilities.formatDate(now, TZ, 'yyyy-MM');
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+    const n = sh.getLastRow() - 1;
+    const rows = n > 0 ? sh.getRange(2, 1, n, 13).getValues() : [];
+    const rich = n > 0 ? sh.getRange(2, 11, n, 1).getRichTextValues() : [];
+
+    const list = [];
+    rows.forEach((r, i) => {
+      const id = String(r[1] || '');
+      const m = id.match(/^AK-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})/);
+      const ym = m ? m[1] + '-' + m[2] : String(r[3]).slice(0, 7);
+      if (ym !== bulan) return;
+      const links = [];
+      (rich[i][0] ? rich[i][0].getRuns() : []).forEach(run => { const u = run.getLinkUrl(); if (u) links.push(u); });
+      list.push({
+        id: id, masa: m ? m[3] + '/' + m[2] + '/' + m[1] + ', ' + m[4] + ':' + m[5] : '',
+        rumah: r[2], nama: r[4] || '(tidak dinyatakan)', tel: r[5], pri: r[6],
+        items: String(r[8] || '').split('\n').filter(String), catatan: r[9],
+        status: r[11] || 'Baru', tindakan: r[12], links: links
+      });
+    });
+
+    const html = laporanHTML(list, bulan, now);
+    const name = 'Laporan_Aduan_Kerosakan_LP2_' + bulan + '.pdf';
+    const pdf = Utilities.newBlob(html, 'text/html', 'laporan.html').getAs('application/pdf').setName(name);
+
+    const root = DriveApp.getFolderById(FOLDER_ID);
+    const it = root.getFoldersByName('Laporan PDF');
+    const folder = it.hasNext() ? it.next() : root.createFolder('Laporan PDF');
+    const old = folder.getFilesByName(name);
+    while (old.hasNext()) old.next().setTrashed(true);   // ganti versi lama bulan yang sama
+    const f = folder.createFile(pdf);
+
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial;padding:24px;max-width:480px">' +
+      '<h2 style="color:#2f5d3a">Laporan PDF siap ✓</h2>' +
+      '<p>' + list.length + ' aduan untuk bulan ' + bulan + '.</p>' +
+      '<p><a style="display:inline-block;background:#2f5d3a;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold" target="_blank" href="' + f.getUrl() + '">Buka PDF</a></p>' +
+      '<p style="color:#666;font-size:13px">Disimpan dalam Google Drive: Aduan Kerosakan LP2 - Gambar / Laporan PDF</p></div>'
+    ).setTitle('Laporan PDF');
+  } catch (err) {
+    return HtmlService.createHtmlOutput('<p style="font-family:Arial;padding:24px">Gagal buat PDF: ' + esc(String(err)) + '</p>');
+  }
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function laporanHTML(list, bulan, now) {
+  const BM = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+  const label = BM[+bulan.slice(5) - 1] + ' ' + bulan.slice(0, 4);
+  const G = '#2f5d3a', L = '#d9dfd8';
+  const td = 'border:1px solid ' + L + ';padding:5px 7px;vertical-align:top;font-size:9.5pt;';
+  const th = td + 'background:#e8efe9;font-size:8.5pt;text-align:left;';
+
+  // Ringkasan
+  let totalItems = 0, kecemasan = 0, selesai = 0;
+  const jenis = {};
+  list.forEach(a => {
+    totalItems += a.items.length;
+    if (a.pri === 'KECEMASAN') kecemasan++;
+    if (a.status === 'Selesai') selesai++;
+    a.items.forEach(t => {
+      const k = t.replace(/^\d+\.\s*/, '').split(' - ')[0].trim();
+      (jenis[k] = jenis[k] || []).push(a.rumah);
+    });
+  });
+  const tile = (num, lbl) => '<td style="border:1px solid ' + L + ';padding:8px 10px;width:25%"><div style="font-size:18pt;font-weight:bold">' + num + '</div><div style="font-size:8pt;color:#5f6b63">' + lbl + '</div></td>';
+
+  let h = '<html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;color:#1d2420;font-size:10pt">';
+  h += '<div style="background:' + G + ';color:#fff;padding:12px 16px"><div style="font-size:8pt;letter-spacing:2px">LABOUR QUARTERS · LEEPANG 2 (LP2)</div>' +
+       '<div style="font-size:18pt;font-weight:bold;margin-top:3px">Laporan Aduan Kerosakan Rumah</div><div style="font-size:9.5pt">Bulan ' + label + '</div></div>';
+  h += '<p style="font-size:9pt;color:#4a564e">Tarikh laporan: <b>' + Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm') + '</b> &nbsp;·&nbsp; Sumber: <b>Borang Aduan QR</b></p>';
+  h += '<h3 style="color:' + G + ';font-size:11pt;margin:14px 0 6px">RINGKASAN</h3><table style="border-collapse:collapse;width:100%"><tr>' +
+       tile(list.length, 'ADUAN') + tile(totalItems, 'ITEM KEROSAKAN') + tile(kecemasan, 'KECEMASAN') + tile(selesai + ' / ' + list.length, 'SELESAI') + '</tr></table>';
+
+  if (!list.length) return h + '<p>Tiada aduan untuk bulan ini.</p></body></html>';
+
+  h += '<h3 style="color:' + G + ';font-size:11pt;margin:14px 0 6px">KEROSAKAN MENGIKUT JENIS</h3><table style="border-collapse:collapse;width:100%">' +
+       '<tr><th style="' + th + '">Jenis</th><th style="' + th + 'width:50px">Bil.</th><th style="' + th + '">Rumah</th></tr>';
+  Object.keys(jenis).sort((a, b) => jenis[b].length - jenis[a].length).forEach(k => {
+    h += '<tr><td style="' + td + '">' + esc(k) + '</td><td style="' + td + 'text-align:center">' + jenis[k].length + '</td><td style="' + td + '">' + esc([...new Set(jenis[k])].join(', ')) + '</td></tr>';
+  });
+  h += '</table>';
+
+  h += '<h3 style="color:' + G + ';font-size:11pt;margin:16px 0 6px">BUTIRAN ADUAN</h3>';
+  list.forEach(a => {
+    const pc = a.status === 'Selesai' ? '#2f5d3a' : (a.pri === 'KECEMASAN' ? '#c2561a' : '#a34712');
+    h += '<div style="border:1px solid #cfd8d0;margin:10px 0;page-break-inside:avoid">';
+    h += '<table style="width:100%;border-collapse:collapse;background:#f3f5f1"><tr><td style="padding:7px 10px;font-size:12pt;font-weight:bold">' + esc(a.rumah) + '</td>' +
+         '<td style="padding:7px 10px;text-align:right;font-size:8.5pt;font-weight:bold;color:' + pc + '">' + esc(String(a.status).toUpperCase()) + ' · ' + esc(a.pri) + '</td></tr></table>';
+    h += '<table style="width:100%;font-size:9pt;margin:6px 4px"><tr><td style="color:#5f6b63;width:70px">ID</td><td>' + esc(a.id) + '</td><td style="color:#5f6b63;width:60px">Masa</td><td>' + esc(a.masa) + '</td></tr>' +
+         '<tr><td style="color:#5f6b63">Pelapor</td><td>' + esc(a.nama) + '</td><td style="color:#5f6b63">Telefon</td><td>' + esc(a.tel) + '</td></tr></table>';
+    h += '<table style="border-collapse:collapse;width:96%;margin:4px 2%"><tr><th style="' + th + 'width:24px">#</th><th style="' + th + 'width:140px">Item</th><th style="' + th + '">Keterangan pelapor</th></tr>';
+    a.items.forEach((t, i) => {
+      const s = t.replace(/^\d+\.\s*/, ''), cut = s.indexOf(' - ');
+      h += '<tr><td style="' + td + 'text-align:center">' + (i + 1) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(0, cut) : s) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(cut + 3) : '–') + '</td></tr>';
+    });
+    h += '</table>';
+    if (a.catatan) h += '<p style="margin:6px 10px;font-size:9pt"><b>Catatan:</b> ' + esc(a.catatan) + '</p>';
+    if (a.tindakan) h += '<p style="margin:6px 10px;font-size:9pt"><b>Tindakan penyelia:</b> ' + esc(a.tindakan) + '</p>';
+    if (a.links.length) {
+      h += '<table style="margin:6px 8px 10px"><tr>';
+      a.links.forEach((u, i) => {
+        const m = u.match(/\/d\/([\w-]+)/);
+        let img = '';
+        try { if (m) img = '<img src="data:image/jpeg;base64,' + Utilities.base64Encode(DriveApp.getFileById(m[1]).getBlob().getBytes()) + '" style="width:150px;height:112px;object-fit:cover">'; } catch (e) {}
+        h += '<td style="padding:3px;vertical-align:top">' + (img || '[Gambar ' + (i + 1) + ']') + '</td>';
+        if (i % 4 === 3) h += '</tr><tr>';
+      });
+      h += '</tr></table>';
+    } else {
+      h += '<p style="margin:6px 10px 10px;font-size:9pt;color:#5f6b63">Gambar: tiada dilampirkan</p>';
+    }
+    h += '</div>';
+  });
+  h += '<table style="width:100%;margin-top:36px;font-size:9pt"><tr>' +
+       ['Disediakan oleh', 'Disemak oleh', 'Diluluskan oleh'].map(t => '<td style="width:33%;padding-right:24px"><div style="border-top:1px solid #1d2420;padding-top:5px">' + t + '</div></td>').join('') + '</tr></table>';
+  return h + '</body></html>';
 }
 
 function out(o) {
