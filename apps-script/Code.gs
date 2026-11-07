@@ -13,6 +13,7 @@ function doPost(e) {
   lock.waitLock(30000);
   try {
     const d = JSON.parse(e.postData.contents);
+    if (d.action === 'status') return out(kemaskiniStatus(d));
     const ss = SpreadsheetApp.openById(SHEET_ID);
     if (ss.getSpreadsheetTimeZone() !== 'Asia/Kuala_Lumpur') ss.setSpreadsheetTimeZone('Asia/Kuala_Lumpur');
     const sh = ss.getSheets()[0];
@@ -76,6 +77,25 @@ function doGet(e) {
 
 /* ---------- DATA UNTUK HALAMAN RINGKASAN (laporan.html) ---------- */
 const DATA_PIN = '708602';
+
+// Tukar Status dan Tindakan dari halaman Ringkasan
+function kemaskiniStatus(d) {
+  if (d.pin !== DATA_PIN) return { ok: false, error: 'PIN salah' };
+  const OK = ['Baru', 'Dalam Tindakan', 'Selesai'];
+  if (OK.indexOf(d.status) === -1) return { ok: false, error: 'Status tidak sah' };
+  const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
+  const n = sh.getLastRow() - 1;
+  if (n < 1) return { ok: false, error: 'Tiada aduan' };
+  const ids = sh.getRange(2, 2, n, 1).getValues().flat().map(String);
+  const i = ids.indexOf(String(d.id));
+  if (i === -1) return { ok: false, error: 'Aduan tidak dijumpai' };
+  const row = i + 2;
+  sh.getRange(row, 12).setValue(d.status);
+  sh.getRange(row, 13).setValue(String(d.tindakan || '').slice(0, 1000));
+  const bg = d.status === 'Selesai' ? '#e2f1e6' : (d.status === 'Dalam Tindakan' ? '#f8f0d6' : null);
+  sh.getRange(row, 12).setBackground(bg);
+  return { ok: true, id: d.id, status: d.status };
+}
 
 function senaraiAduan() {
   const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];

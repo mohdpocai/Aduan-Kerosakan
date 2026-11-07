@@ -79,6 +79,19 @@ h2{font:700 19px/1.1 var(--display);margin:0;letter-spacing:.03em;text-transform
 .thumbs a{display:block;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--soft);max-width:100%;color:var(--accent);font-size:13px;font-weight:600;text-decoration:none}
 .thumbs img{width:100%;height:100%;object-fit:cover;display:block}
 .thumbs a.txt{display:flex;align-items:center;justify-content:center}
+.upd{border-top:1px dashed var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.upd .lbl{font:700 14px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.seg button{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:10px 4px;font:600 14px var(--body);cursor:pointer;min-height:44px}
+.seg button[aria-pressed=true][data-s="Baru"]{background:var(--baru);border-color:var(--baru);color:#fff}
+.seg button[aria-pressed=true][data-s="Dalam Tindakan"]{background:var(--proses);border-color:var(--proses);color:#fff}
+.seg button[aria-pressed=true][data-s="Selesai"]{background:var(--siap);border-color:var(--siap);color:#fff}
+.upd textarea{font:15px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;min-height:64px;resize:vertical;width:100%}
+.upd .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.upd .save{border:0;border-radius:8px;background:var(--accent);color:var(--accent-fg);font:700 16px var(--display);letter-spacing:.04em;text-transform:uppercase;padding:11px 18px;cursor:pointer}
+.upd .save:disabled{opacity:.55}
+.upd .msg{font-size:14px;color:var(--muted)}
+.upd .msg.ok{color:var(--siap)} .upd .msg.bad{color:var(--baru)}
 .empty{color:var(--muted);text-align:center;padding:20px 8px}
 .gate{max-width:360px;margin:40px auto}
 .gate input{font:600 24px var(--body);letter-spacing:.3em;text-align:center;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
@@ -132,7 +145,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
       <h2>Senarai Aduan</h2>
       <div class="chips" id="sfilter" role="group" aria-label="Tapis status"></div>
       <div class="list" id="list"></div>
-      <p class="muted" style="margin:0">Untuk tukar status atau tulis tindakan, kemaskini dalam Google Sheet <b>Aduan Kerosakan LP2 - LAPORAN</b>, kemudian tekan Muat Semula.</p>
+      <p class="muted" style="margin:0">Tekan satu aduan untuk tukar status dan tulis tindakan. Perubahan disimpan terus ke Google Sheet.</p>
     </section>
   </div>
 </div></main>
@@ -219,7 +232,8 @@ function card(a){
   const st = stKey(a.status);
   const pri = a.pri !== "BIASA" ? `<span class="pill p-${esc(a.pri)}">${esc(a.pri)}</span>` : "";
   const photos = a.photos.map((id,i) => `<a href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener"><img loading="lazy" alt="Gambar ${i+1}" src="https://drive.google.com/thumbnail?id=${id}&sz=w320" onerror="this.parentNode.classList.add('txt');this.parentNode.textContent='Gambar ${i+1}'"></a>`).join("");
-  return `<details class="rep">
+  const segs = ["Baru","Dalam Tindakan","Selesai"].map(s => `<button type="button" data-s="${s}" aria-pressed="${a.status === s}">${s}</button>`).join("");
+  return `<details class="rep" data-id="${esc(a.id)}" ${openId === a.id ? "open" : ""}>
     <summary><div class="h"><div class="house">${esc(a.rumah || "-")}</div><div class="when">${fmt(a.masa)} · ${a.items.length} item${a.photos.length ? " · " + a.photos.length + " gambar" : ""}</div></div>
     <div class="pills">${pri}<span class="pill s-${st}">${esc(a.status)}</span></div></summary>
     <div class="body">
@@ -228,8 +242,40 @@ function card(a){
       ${a.tindakan ? `<div class="note"><b>Tindakan penyelia:</b> ${esc(a.tindakan)}</div>` : ""}
       ${photos ? `<div class="thumbs">${photos}</div>` : `<div class="muted">Tiada gambar.</div>`}
       <div class="meta"><span>Pelapor: <b>${esc(a.nama || "-")}</b></span><span>Tel: <b>${esc(a.tel || "-")}</b></span><span>${esc(a.id)}</span></div>
+      <div class="upd">
+        <div class="lbl">Kemaskini Status</div>
+        <div class="seg" role="group" aria-label="Status">${segs}</div>
+        <textarea class="tind" placeholder="Tindakan diambil, cth: Tukar 4 kaca tingkap, 10/11" aria-label="Tindakan penyelia">${esc(a.tindakan)}</textarea>
+        <div class="row"><button type="button" class="save">Simpan</button><span class="msg" role="status"></span></div>
+      </div>
     </div></details>`;
 }
+
+// Simpan status ke Google Sheet
+let openId = null;
+$("list").addEventListener("toggle", e => { if(e.target.matches("details.rep")){ if(e.target.open) openId = e.target.dataset.id; else if(openId === e.target.dataset.id) openId = null; } }, true);
+$("list").addEventListener("click", async e => {
+  const seg = e.target.closest(".seg button");
+  if(seg){ seg.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === seg)); return; }
+  const save = e.target.closest(".save"); if(!save) return;
+  const box = save.closest("details.rep"), id = box.dataset.id;
+  const sel = box.querySelector('.seg button[aria-pressed="true"]');
+  const status = sel ? sel.dataset.s : "Baru", tindakan = box.querySelector(".tind").value.trim();
+  const msg = box.querySelector(".upd .msg");
+  save.disabled = true; msg.className = "msg"; msg.textContent = "Menyimpan…";
+  try{
+    const r = await fetch(API, {method:"POST", body: JSON.stringify({action:"status", pin:PIN, id, status, tindakan})});
+    const j = await r.json();
+    if(!j.ok) throw new Error(j.error || "gagal");
+    const a = ALL.find(x => x.id === id); if(a){ a.status = status; a.tindakan = tindakan; }
+    openId = id; render();
+    const m2 = document.querySelector(`details.rep[data-id="${CSS.escape(id)}"] .upd .msg`);
+    if(m2){ m2.className = "msg ok"; m2.textContent = "✓ Disimpan ke Google Sheet"; }
+  }catch(err){
+    msg.className = "msg bad"; msg.textContent = err.message === "gagal" || err.name === "TypeError" ? "Gagal simpan. Semak internet dan cuba lagi." : "Gagal: " + err.message;
+    save.disabled = false;
+  }
+});
 
 const saved = load("ak_pin");
 if(saved){ $("pin").value = saved; openDash(saved); }
