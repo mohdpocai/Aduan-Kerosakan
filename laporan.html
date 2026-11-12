@@ -49,7 +49,7 @@ h2{font:700 19px/1.1 var(--display);margin:0;letter-spacing:.03em;text-transform
 .legend b{color:var(--fg);font-variant-numeric:tabular-nums}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
 .bars{display:flex;flex-direction:column;gap:9px}
-.bar{display:grid;grid-template-columns:minmax(110px,38%) 1fr 28px;gap:10px;align-items:center;font-size:15px}
+.bar{display:grid;grid-template-columns:minmax(110px,38%) 1fr 36px;gap:10px;align-items:center;font-size:15px}
 .bar .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar .track{height:12px;background:var(--soft);border-radius:6px;overflow:hidden}
 .bar .fill{height:100%;background:var(--accent);border-radius:6px}
@@ -92,6 +92,16 @@ h2{font:700 19px/1.1 var(--display);margin:0;letter-spacing:.03em;text-transform
 .upd .save:disabled{opacity:.55}
 .upd .msg{font-size:14px;color:var(--muted)}
 .upd .msg.ok{color:var(--siap)} .upd .msg.bad{color:var(--baru)}
+.itm{border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.itm .nm{font-weight:600}
+.itm .nm span{font-weight:400;color:var(--muted)}
+.itm .seg button{padding:8px 4px;min-height:40px;font-size:13px;background:var(--card)}
+.itm input{font:15px var(--body);color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%}
+.itm.done{border-color:color-mix(in srgb,var(--siap) 45%,var(--line))}
+.prog{font-size:13px;color:var(--muted)}
+.bar .fill{position:relative;overflow:hidden}
+.bar .fill i{position:absolute;inset:0 auto 0 0;background:var(--siap)}
+.bar .c small{font-weight:400;color:var(--muted)}
 .empty{color:var(--muted);text-align:center;padding:20px 8px}
 .gate{max-width:360px;margin:40px auto}
 .gate input{font:600 24px var(--body);letter-spacing:.3em;text-align:center;width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)}
@@ -126,12 +136,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
     <div class="tiles">
       <div class="tile"><div class="n" id="tA">0</div><div class="l">Aduan</div></div>
       <div class="tile"><div class="n" id="tI">0</div><div class="l">Item rosak</div></div>
-      <div class="tile warn"><div class="n" id="tB">0</div><div class="l">Belum selesai</div></div>
+      <div class="tile warn"><div class="n" id="tB">0</div><div class="l">Item belum selesai</div></div>
       <div class="tile"><div class="n" id="tK">0</div><div class="l">Kecemasan</div></div>
     </div>
 
     <section>
-      <h2>Status Tindakan</h2>
+      <h2>Status Kerosakan (Item)</h2>
       <div class="stack" id="stack"></div>
       <div class="legend" id="legend"></div>
     </section>
@@ -145,7 +155,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,summary:focus-visible{o
       <h2>Senarai Aduan</h2>
       <div class="chips" id="sfilter" role="group" aria-label="Tapis status"></div>
       <div class="list" id="list"></div>
-      <p class="muted" style="margin:0">Tekan satu aduan untuk tukar status dan tulis tindakan. Perubahan disimpan terus ke Google Sheet.</p>
+      <p class="muted" style="margin:0">Tekan satu aduan untuk tukar status setiap kerosakan. Status aduan bertukar sendiri: semua item Selesai = aduan Selesai.</p>
     </section>
   </div>
 </div></main>
@@ -203,18 +213,19 @@ function render(){
   // tiles
   const items = L.reduce((n,a) => n + a.items.length, 0);
   const cnt = {Baru:0, Dalam:0, Selesai:0}; L.forEach(a => cnt[stKey(a.status)]++);
+  const icnt = {Baru:0, Dalam:0, Selesai:0}; L.forEach(a => a.items.forEach(i => icnt[stKey(i.status || "Baru")]++));
   $("tA").textContent = L.length; $("tI").textContent = items;
-  $("tB").textContent = cnt.Baru + cnt.Dalam; $("tK").textContent = L.filter(a => a.pri === "KECEMASAN").length;
+  $("tB").textContent = icnt.Baru + icnt.Dalam; $("tK").textContent = L.filter(a => a.pri === "KECEMASAN").length;
   // status stack
   const cols = {Baru:"var(--baru)", Dalam:"var(--proses)", Selesai:"var(--siap)"};
   const names = {Baru:"Baru", Dalam:"Dalam Tindakan", Selesai:"Selesai"};
-  $("stack").innerHTML = L.length ? Object.keys(cnt).filter(k => cnt[k]).map(k => `<span style="width:${cnt[k]/L.length*100}%;background:${cols[k]}"></span>`).join("") : "";
-  $("legend").innerHTML = Object.keys(cnt).map(k => `<span><i class="dot" style="background:${cols[k]}"></i>${names[k]} <b>${cnt[k]}</b></span>`).join("");
+  $("stack").innerHTML = items ? Object.keys(icnt).filter(k => icnt[k]).map(k => `<span style="width:${icnt[k]/items*100}%;background:${cols[k]}"></span>`).join("") : "";
+  $("legend").innerHTML = Object.keys(icnt).map(k => `<span><i class="dot" style="background:${cols[k]}"></i>${names[k]} <b>${icnt[k]}</b></span>`).join("");
   // by type
-  const t = {}; L.forEach(a => a.items.forEach(i => { (t[i.name] = t[i.name] || new Set()).add(a.id); }));
-  const rows = Object.entries(t).map(([k,s]) => [k, s.size]).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+  const t = {}; L.forEach(a => a.items.forEach(i => { const o = t[i.name] = t[i.name] || {n:0, d:0}; o.n++; if(i.status === "Selesai") o.d++; }));
+  const rows = Object.entries(t).map(([k,o]) => [k, o.n, o.d]).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
   const max = rows.length ? rows[0][1] : 1;
-  $("bars").innerHTML = rows.length ? rows.map(([k,n]) => `<div class="bar"><div class="t" title="${esc(k)}">${esc(k)}</div><div class="track"><div class="fill" style="width:${n/max*100}%"></div></div><div class="c">${n}</div></div>`).join("")
+  $("bars").innerHTML = rows.length ? rows.map(([k,n,d]) => `<div class="bar"><div class="t" title="${esc(k)}">${esc(k)}</div><div class="track"><div class="fill" style="width:${n/max*100}%"><i style="width:${d/n*100}%"></i></div></div><div class="c">${d}/${n}</div></div>`).join("")
     : `<div class="empty">Tiada kerosakan dilaporkan.</div>`;
   // status filter
   const sf = $("sfilter"); sf.innerHTML = "";
@@ -232,20 +243,25 @@ function card(a){
   const st = stKey(a.status);
   const pri = a.pri !== "BIASA" ? `<span class="pill p-${esc(a.pri)}">${esc(a.pri)}</span>` : "";
   const photos = a.photos.map((id,i) => `<a href="https://drive.google.com/file/d/${id}/view" target="_blank" rel="noopener"><img loading="lazy" alt="Gambar ${i+1}" src="https://drive.google.com/thumbnail?id=${id}&sz=w320" onerror="this.parentNode.classList.add('txt');this.parentNode.textContent='Gambar ${i+1}'"></a>`).join("");
-  const segs = ["Baru","Dalam Tindakan","Selesai"].map(s => `<button type="button" data-s="${s}" aria-pressed="${a.status === s}">${s}</button>`).join("");
+  const done = a.items.filter(i => i.status === "Selesai").length;
+  const rowsHtml = a.items.map((i,k) => {
+    const s0 = i.status || "Baru";
+    const segs = ["Baru","Dalam Tindakan","Selesai"].map(s => `<button type="button" data-s="${s}" aria-pressed="${s0 === s}">${s}</button>`).join("");
+    return `<div class="itm${s0 === "Selesai" ? " done" : ""}" data-k="${k}"><div class="nm">${k+1}. ${esc(i.name)}${i.note ? ` <span>– ${esc(i.note)}</span>` : ""}</div>
+      <div class="seg" role="group" aria-label="Status ${esc(i.name)}">${segs}</div>
+      <input type="text" class="itind" value="${esc(i.tindakan || "")}" placeholder="Tindakan untuk ${esc(i.name.toLowerCase())}" aria-label="Tindakan ${esc(i.name)}"></div>`;
+  }).join("");
   return `<details class="rep" data-id="${esc(a.id)}" ${openId === a.id ? "open" : ""}>
-    <summary><div class="h"><div class="house">${esc(a.rumah || "-")}</div><div class="when">${fmt(a.masa)} · ${a.items.length} item${a.photos.length ? " · " + a.photos.length + " gambar" : ""}</div></div>
+    <summary><div class="h"><div class="house">${esc(a.rumah || "-")}</div><div class="when">${fmt(a.masa)} · ${done}/${a.items.length} item selesai${a.photos.length ? " · " + a.photos.length + " gambar" : ""}</div></div>
     <div class="pills">${pri}<span class="pill s-${st}">${esc(a.status)}</span></div></summary>
     <div class="body">
-      <ol>${a.items.map(i => `<li>${esc(i.name)}${i.note ? ` <span>– ${esc(i.note)}</span>` : ""}</li>`).join("")}</ol>
       ${a.catatan ? `<div class="note"><b>Catatan:</b> ${esc(a.catatan)}</div>` : ""}
-      ${a.tindakan ? `<div class="note"><b>Tindakan penyelia:</b> ${esc(a.tindakan)}</div>` : ""}
       ${photos ? `<div class="thumbs">${photos}</div>` : `<div class="muted">Tiada gambar.</div>`}
       <div class="meta"><span>Pelapor: <b>${esc(a.nama || "-")}</b></span><span>Tel: <b>${esc(a.tel || "-")}</b></span><span>${esc(a.id)}</span></div>
       <div class="upd">
-        <div class="lbl">Kemaskini Status</div>
-        <div class="seg" role="group" aria-label="Status">${segs}</div>
-        <textarea class="tind" placeholder="Tindakan diambil, cth: Tukar 4 kaca tingkap, 10/11" aria-label="Tindakan penyelia">${esc(a.tindakan)}</textarea>
+        <div class="lbl">Kemaskini Status Kerosakan</div>
+        ${rowsHtml}
+        <textarea class="tind" placeholder="Catatan penyelia (pilihan)" aria-label="Catatan penyelia">${esc(a.tindakan)}</textarea>
         <div class="row"><button type="button" class="save">Simpan</button><span class="msg" role="status"></span></div>
       </div>
     </div></details>`;
@@ -259,15 +275,19 @@ $("list").addEventListener("click", async e => {
   if(seg){ seg.parentNode.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b === seg)); return; }
   const save = e.target.closest(".save"); if(!save) return;
   const box = save.closest("details.rep"), id = box.dataset.id;
-  const sel = box.querySelector('.seg button[aria-pressed="true"]');
-  const status = sel ? sel.dataset.s : "Baru", tindakan = box.querySelector(".tind").value.trim();
+  const itemsUpd = [...box.querySelectorAll(".itm")].map(el => {
+    const b = el.querySelector('.seg button[aria-pressed="true"]');
+    return { status: b ? b.dataset.s : "Baru", tindakan: el.querySelector(".itind").value.trim() };
+  });
+  const tindakan = box.querySelector(".tind").value.trim();
   const msg = box.querySelector(".upd .msg");
   save.disabled = true; msg.className = "msg"; msg.textContent = "Menyimpan…";
   try{
-    const r = await fetch(API, {method:"POST", body: JSON.stringify({action:"status", pin:PIN, id, status, tindakan})});
+    const r = await fetch(API, {method:"POST", body: JSON.stringify({action:"status", pin:PIN, id, items:itemsUpd, tindakan})});
     const j = await r.json();
     if(!j.ok) throw new Error(j.error || "gagal");
-    const a = ALL.find(x => x.id === id); if(a){ a.status = status; a.tindakan = tindakan; }
+    const a = ALL.find(x => x.id === id);
+    if(a){ a.status = j.status; a.tindakan = tindakan; a.items.forEach((it,k) => { if(itemsUpd[k]){ it.status = itemsUpd[k].status; it.tindakan = itemsUpd[k].tindakan; } }); }
     openId = id; render();
     const m2 = document.querySelector(`details.rep[data-id="${CSS.escape(id)}"] .upd .msg`);
     if(m2){ m2.className = "msg ok"; m2.textContent = "✓ Disimpan ke Google Sheet"; }

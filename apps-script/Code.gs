@@ -6,7 +6,7 @@ const SHEET_ID  = '1_ZgsW-EDqbtIH2MK4MzrCu_GjVR8QjVQLAOxk35h4ZQ'; // Google Shee
 const FOLDER_ID = '1FntAmCKj7ZXeID7lCEnxrWQNKSNRRzNT';            // Folder "Aduan Kerosakan LP2 - Gambar"
 
 const HEADERS = ['Masa Hantar','ID Aduan','No. Rumah','Tarikh','Nama Pelapor','No. Telefon',
-  'Keutamaan','Bil. Kerosakan','Kerosakan','Catatan','Gambar','Status','Tindakan / Catatan Penyelia'];
+  'Keutamaan','Bil. Kerosakan','Kerosakan','Catatan','Gambar','Status','Tindakan / Catatan Penyelia','Status Kerosakan'];
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
@@ -41,7 +41,7 @@ function doPost(e) {
     const items = (d.items || []).map((x, i) => (i + 1) + '. ' + x.name + (x.note ? ' - ' + x.note : '')).join('\n');
 
     sh.appendRow([new Date(), d.id, d.rumah, d.tarikh, d.nama, "'" + (d.tel || ''), d.pri,
-      (d.items || []).length, items, d.catatan || '', '', 'Baru', '']);
+      (d.items || []).length, items, d.catatan || '', '', 'Baru', '', '']);
     const row = sh.getLastRow();
 
     // Pautan gambar boleh ditekan: "Gambar 1, Gambar 2, ..."
@@ -78,11 +78,30 @@ function doGet(e) {
 /* ---------- DATA UNTUK HALAMAN RINGKASAN (laporan.html) ---------- */
 const DATA_PIN = '708602';
 
-// Tukar Status dan Tindakan dari halaman Ringkasan
+// Tukar status setiap kerosakan dari halaman Ringkasan.
+// Lajur N "Status Kerosakan": satu baris setiap item, cth "1. Tingkap: Selesai - tukar kaca"
+const ST_OK = ['Baru', 'Dalam Tindakan', 'Selesai'];
+
+function bacaStatusItem(text, count) {
+  const out = [];
+  String(text || '').split('\n').forEach(line => {
+    const m = line.match(/^(\d+)\.\s*.*?:\s*(Baru|Dalam Tindakan|Selesai)(?:\s+-\s+([\s\S]*))?$/);
+    if (m) out[+m[1] - 1] = { status: m[2], tindakan: (m[3] || '').trim() };
+  });
+  const res = [];
+  for (let i = 0; i < count; i++) res.push(out[i] || { status: 'Baru', tindakan: '' });
+  return res;
+}
+
+function statusKeseluruhan(st) {
+  if (!st.length) return 'Baru';
+  if (st.every(x => x.status === 'Selesai')) return 'Selesai';
+  if (st.some(x => x.status !== 'Baru')) return 'Dalam Tindakan';
+  return 'Baru';
+}
+
 function kemaskiniStatus(d) {
   if (d.pin !== DATA_PIN) return { ok: false, error: 'PIN salah' };
-  const OK = ['Baru', 'Dalam Tindakan', 'Selesai'];
-  if (OK.indexOf(d.status) === -1) return { ok: false, error: 'Status tidak sah' };
   const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
   const n = sh.getLastRow() - 1;
   if (n < 1) return { ok: false, error: 'Tiada aduan' };
@@ -90,18 +109,30 @@ function kemaskiniStatus(d) {
   const i = ids.indexOf(String(d.id));
   if (i === -1) return { ok: false, error: 'Aduan tidak dijumpai' };
   const row = i + 2;
-  sh.getRange(row, 12).setValue(d.status);
-  sh.getRange(row, 13).setValue(String(d.tindakan || '').slice(0, 1000));
-  const bg = d.status === 'Selesai' ? '#e2f1e6' : (d.status === 'Dalam Tindakan' ? '#f8f0d6' : null);
-  sh.getRange(row, 12).setBackground(bg);
-  return { ok: true, id: d.id, status: d.status };
+  if (sh.getRange(1, 14).getValue() === '') sh.getRange(1, 14).setValue('Status Kerosakan').setFontWeight('bold');
+
+  const names = String(sh.getRange(row, 9).getValue() || '').split('\n').filter(String)
+    .map(t => t.replace(/^\d+\.\s*/, '').split(' - ')[0].trim());
+  const items = (d.items || []).slice(0, names.length).map(x => ({
+    status: ST_OK.indexOf(x.status) > -1 ? x.status : 'Baru',
+    tindakan: String(x.tindakan || '').replace(/\s*\n\s*/g, ' ').slice(0, 300)
+  }));
+  while (items.length < names.length) items.push({ status: 'Baru', tindakan: '' });
+
+  const text = names.map((nm, k) => (k + 1) + '. ' + nm + ': ' + items[k].status + (items[k].tindakan ? ' - ' + items[k].tindakan : '')).join('\n');
+  const status = statusKeseluruhan(items);
+  sh.getRange(row, 14).setValue(text).setWrap(true);
+  sh.getRange(row, 12).setValue(status)
+    .setBackground(status === 'Selesai' ? '#e2f1e6' : (status === 'Dalam Tindakan' ? '#f8f0d6' : null));
+  if (d.tindakan !== undefined) sh.getRange(row, 13).setValue(String(d.tindakan || '').slice(0, 1000));
+  return { ok: true, id: d.id, status: status, items: items };
 }
 
 function senaraiAduan() {
   const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
   const n = sh.getLastRow() - 1;
   if (n < 1) return { ok: true, aduan: [] };
-  const rows = sh.getRange(2, 1, n, 13).getValues();
+  const rows = sh.getRange(2, 1, n, 14).getValues();
   const rich = sh.getRange(2, 11, n, 1).getRichTextValues();
   const aduan = rows.map((r, i) => {
     const id = String(r[1] || '');
@@ -114,10 +145,15 @@ function senaraiAduan() {
       id: id, row: i + 2,
       masa: m ? m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] : '',
       rumah: String(r[2] || ''), nama: String(r[4] || ''), tel: String(r[5] || ''), pri: String(r[6] || 'BIASA'),
-      items: String(r[8] || '').split('\n').filter(String).map(t => {
-        const s = t.replace(/^\d+\.\s*/, ''), c = s.indexOf(' - ');
-        return c > -1 ? { name: s.slice(0, c), note: s.slice(c + 3) } : { name: s, note: '' };
-      }),
+      items: (() => {
+        const lines = String(r[8] || '').split('\n').filter(String);
+        const st = bacaStatusItem(r[13], lines.length);
+        return lines.map((t, k) => {
+          const s = t.replace(/^\d+\.\s*/, ''), c = s.indexOf(' - ');
+          const it = c > -1 ? { name: s.slice(0, c), note: s.slice(c + 3) } : { name: s, note: '' };
+          it.status = st[k].status; it.tindakan = st[k].tindakan; return it;
+        });
+      })(),
       catatan: String(r[9] || ''), status: String(r[11] || 'Baru'), tindakan: String(r[12] || ''), photos: photos
     };
   }).filter(a => a.id);
@@ -134,7 +170,7 @@ function buatPDF(bulan) {
     bulan = /^\d{4}-\d{2}$/.test(bulan || '') ? bulan : Utilities.formatDate(now, TZ, 'yyyy-MM');
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheets()[0];
     const n = sh.getLastRow() - 1;
-    const rows = n > 0 ? sh.getRange(2, 1, n, 13).getValues() : [];
+    const rows = n > 0 ? sh.getRange(2, 1, n, 14).getValues() : [];
     const rich = n > 0 ? sh.getRange(2, 11, n, 1).getRichTextValues() : [];
 
     const list = [];
@@ -149,7 +185,8 @@ function buatPDF(bulan) {
         id: id, masa: m ? m[3] + '/' + m[2] + '/' + m[1] + ', ' + m[4] + ':' + m[5] : '',
         rumah: r[2], nama: r[4] || '(tidak dinyatakan)', tel: r[5], pri: r[6],
         items: String(r[8] || '').split('\n').filter(String), catatan: r[9],
-        status: r[11] || 'Baru', tindakan: r[12], links: links
+        status: r[11] || 'Baru', tindakan: r[12], links: links,
+        itemSt: bacaStatusItem(r[13], String(r[8] || '').split('\n').filter(String).length)
       });
     });
 
@@ -186,12 +223,13 @@ function laporanHTML(list, bulan, now) {
   const th = td + 'background:#e8efe9;font-size:8.5pt;text-align:left;';
 
   // Ringkasan
-  let totalItems = 0, kecemasan = 0, selesai = 0;
+  let totalItems = 0, kecemasan = 0, selesai = 0, itemSiap = 0;
   const jenis = {};
   list.forEach(a => {
     totalItems += a.items.length;
     if (a.pri === 'KECEMASAN') kecemasan++;
     if (a.status === 'Selesai') selesai++;
+    itemSiap += a.itemSt.filter(x => x.status === 'Selesai').length;
     a.items.forEach(t => {
       const k = t.replace(/^\d+\.\s*/, '').split(' - ')[0].trim();
       (jenis[k] = jenis[k] || []).push(a.rumah);
@@ -204,7 +242,7 @@ function laporanHTML(list, bulan, now) {
        '<div style="font-size:18pt;font-weight:bold;margin-top:3px">Laporan Aduan Kerosakan Rumah</div><div style="font-size:9.5pt">Bulan ' + label + '</div></div>';
   h += '<p style="font-size:9pt;color:#4a564e">Tarikh laporan: <b>' + Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm') + '</b> &nbsp;·&nbsp; Sumber: <b>Borang Aduan QR</b></p>';
   h += '<h3 style="color:' + G + ';font-size:11pt;margin:14px 0 6px">RINGKASAN</h3><table style="border-collapse:collapse;width:100%"><tr>' +
-       tile(list.length, 'ADUAN') + tile(totalItems, 'ITEM KEROSAKAN') + tile(kecemasan, 'KECEMASAN') + tile(selesai + ' / ' + list.length, 'SELESAI') + '</tr></table>';
+       tile(list.length, 'ADUAN') + tile(totalItems, 'ITEM KEROSAKAN') + tile(itemSiap + ' / ' + totalItems, 'ITEM SELESAI') + tile(selesai + ' / ' + list.length, 'ADUAN SELESAI') + '</tr></table>';
 
   if (!list.length) return h + '<p>Tiada aduan untuk bulan ini.</p></body></html>';
 
@@ -223,10 +261,13 @@ function laporanHTML(list, bulan, now) {
          '<td style="padding:7px 10px;text-align:right;font-size:8.5pt;font-weight:bold;color:' + pc + '">' + esc(String(a.status).toUpperCase()) + ' · ' + esc(a.pri) + '</td></tr></table>';
     h += '<table style="width:100%;font-size:9pt;margin:6px 4px"><tr><td style="color:#5f6b63;width:70px">ID</td><td>' + esc(a.id) + '</td><td style="color:#5f6b63;width:60px">Masa</td><td>' + esc(a.masa) + '</td></tr>' +
          '<tr><td style="color:#5f6b63">Pelapor</td><td>' + esc(a.nama) + '</td><td style="color:#5f6b63">Telefon</td><td>' + esc(a.tel) + '</td></tr></table>';
-    h += '<table style="border-collapse:collapse;width:96%;margin:4px 2%"><tr><th style="' + th + 'width:24px">#</th><th style="' + th + 'width:140px">Item</th><th style="' + th + '">Keterangan pelapor</th></tr>';
+    h += '<table style="border-collapse:collapse;width:96%;margin:4px 2%"><tr><th style="' + th + 'width:24px">#</th><th style="' + th + 'width:140px">Item</th><th style="' + th + '">Keterangan pelapor</th><th style="' + th + 'width:95px">Status</th><th style="' + th + '">Tindakan</th></tr>';
     a.items.forEach((t, i) => {
       const s = t.replace(/^\d+\.\s*/, ''), cut = s.indexOf(' - ');
-      h += '<tr><td style="' + td + 'text-align:center">' + (i + 1) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(0, cut) : s) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(cut + 3) : '–') + '</td></tr>';
+      const st = a.itemSt[i] || { status: 'Baru', tindakan: '' };
+      const sc = st.status === 'Selesai' ? 'color:#2f7a45;background:#e2f1e6;' : (st.status === 'Dalam Tindakan' ? 'color:#8a6d0f;background:#f8f0d6;' : 'color:#a34712;background:#fbeee5;');
+      h += '<tr><td style="' + td + 'text-align:center">' + (i + 1) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(0, cut) : s) + '</td><td style="' + td + '">' + esc(cut > -1 ? s.slice(cut + 3) : '–') + '</td>' +
+           '<td style="' + td + sc + 'font-weight:bold;font-size:8.5pt">' + esc(st.status) + '</td><td style="' + td + '">' + esc(st.tindakan || '') + '</td></tr>';
     });
     h += '</table>';
     if (a.catatan) h += '<p style="margin:6px 10px;font-size:9pt"><b>Catatan:</b> ' + esc(a.catatan) + '</p>';
